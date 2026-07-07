@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # The TradingAgents submodule is not needed for lint/type/tests;
+        # the adapter extra is exercised only via the committed trace.
+        with:
+          submodules: false
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: uv sync --dev
+      - name: Lint (ruff)
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Type-check (mypy --strict)
+        run: uv run mypy
+      - name: Tests
+        run: uv run pytest --cov --cov-report=term
