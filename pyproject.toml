@@ -68,6 +68,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
 "examples/**" = ["D"]
+"benchmarks/**" = ["D"]
 
 [tool.mypy]
 python_version = "3.11"

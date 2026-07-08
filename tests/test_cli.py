@@ -51,7 +51,35 @@ def test_replay_tampered_fails(sample_trace: Path, tmp_path: Path) -> None:
 
 
 def test_future_phase_commands_exit_2() -> None:
-    for command in ("run", "report", "diff", "bench"):
+    for command in ("report", "diff", "bench"):
         result = runner.invoke(app, [command])
         assert result.exit_code == 2, command
         assert "not implemented yet" in result.output
+
+
+DATA = Path(__file__).resolve().parent.parent / "benchmarks" / "data"
+
+
+def test_run_over_bundled_data_and_writes_verifiable_trace(tmp_path: Path) -> None:
+    out = tmp_path / "run.jsonl"
+    result = runner.invoke(
+        app,
+        ["run", "--data", str(DATA), "--symbol", "AAPL", "--agent", "sma", "--out", str(out)],
+    )
+    assert result.exit_code == 0, result.output
+    assert "RUN OK" in result.output
+    assert out.exists()
+    # The trace the CLI wrote must verify and replay byte-identically.
+    verify_result = runner.invoke(app, ["verify", str(out)])
+    assert verify_result.exit_code == 0
+    replay_result = runner.invoke(app, ["replay", str(out)])
+    assert replay_result.exit_code == 0
+    assert "byte-identical" in replay_result.stdout
+
+
+def test_run_without_out_prints_summary() -> None:
+    result = runner.invoke(
+        app, ["run", "--data", str(DATA), "--symbol", "MSFT", "--agent", "buy_and_hold"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "RUN OK" in result.output

@@ -18,4 +18,7 @@ evaluation reports.
 - **Phase 1 — trace capture & deterministic replay:** implemented.
 - **Phase 2 — invariant engine:** implemented (six pure risk invariants +
   conservation-enforcing portfolio, rogue-agent containment proven).
-- Phases 3–6: not started.
+- **Phase 3 — market replay simulator & paper fills:** implemented (bar-replay
+  over bundled synthetic OHLCV, next-open fills with slippage/fees vetted by
+  the invariant engine, golden-file test, `tradewind run`).
+- Phases 4–6: not started.

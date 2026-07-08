@@ -6,6 +6,8 @@ specific error. Commands for later phases exist as stubs that exit 2 so
 scripts fail loudly rather than silently no-op.
 """
 
+from decimal import Decimal
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -63,10 +65,83 @@ def _not_yet(phase: str) -> None:
     raise typer.Exit(code=2)
 
 
+class AgentChoice(StrEnum):
+    """Built-in scripted agents selectable from the CLI."""
+
+    buy_and_hold = "buy_and_hold"
+    sma = "sma"
+
+
 @app.command()
-def run() -> None:
-    """Run an agent under the harness (Phase 3+)."""
-    _not_yet("Phase 3")
+def run(
+    data: Annotated[Path, typer.Option(exists=True, file_okay=False, help="OHLCV data dir")],
+    symbol: Annotated[str, typer.Option(help="Symbol to trade")] = "AAPL",
+    agent: Annotated[AgentChoice, typer.Option(help="Built-in scripted agent")] = (AgentChoice.sma),
+    cash: Annotated[str, typer.Option(help="Initial cash")] = "100000",
+    quantity: Annotated[str, typer.Option(help="Order size in shares")] = "100",
+    out: Annotated[
+        Path | None, typer.Option(help="Write the decision trace here (must not exist)")
+    ] = None,
+) -> None:
+    """Replay a built-in scripted agent over bundled bars under the harness.
+
+    Deterministic and offline: no LLM, no network. With ``--out`` it writes a
+    chain-hashed decision trace and verifies it before exiting.
+    """
+    from tradewind.invariants.domain import MarketModel, RiskConfig
+    from tradewind.sim import SimConfig, Simulator, load_price_data
+    from tradewind.sim.agents import BuyAndHold, SmaCrossover
+    from tradewind.sim.simulator import Agent
+    from tradewind.trace.canonical import canonical_json, sha256_hex
+    from tradewind.trace.events import TraceHeader
+    from tradewind.trace.writer import TraceWriter
+
+    universe = frozenset({symbol})
+    risk = RiskConfig(
+        max_position_per_symbol=Decimal("100000"),
+        max_gross_exposure=Decimal("100000000"),
+        max_drawdown=Decimal("0.25"),
+        price_sanity_pct=Decimal("0.10"),
+        max_orders_per_window=100,
+        rate_window_seconds=86400,
+    )
+    config = SimConfig(
+        initial_cash=Decimal(cash),
+        universe=universe,
+        risk=risk,
+        model=MarketModel(fee_bps=Decimal("1"), slippage_bps=Decimal("5")),
+    )
+    chosen: Agent = (
+        BuyAndHold(symbol, Decimal(quantity))
+        if agent is AgentChoice.buy_and_hold
+        else SmaCrossover(symbol, Decimal(quantity))
+    )
+    prices = load_price_data(data, universe)
+    simulator = Simulator(prices, config)
+
+    if out is None:
+        result = simulator.run(chosen)
+    else:
+        config_hash = sha256_hex(
+            canonical_json({"agent": agent.value, "symbol": symbol, "cash": cash, "qty": quantity})
+        )
+        header = TraceHeader(
+            config_hash=config_hash,
+            code_version="0.1.0",
+            model_ids=[f"scripted:{agent.value}"],
+            submodule_sha=None,
+            rng_seed=0,
+        )
+        with TraceWriter(out, header) as writer:
+            result = simulator.run(chosen, writer=writer)
+        verification = verify_trace(out)
+        typer.echo(f"trace written to {out} ({verification.event_count} events)")
+        typer.echo(f"chain hash {verification.final_chain_hash}")
+
+    typer.echo(
+        f"RUN OK: proposed={result.proposed} admitted={result.admitted} "
+        f"violations={result.violations} final_equity={result.final_equity}"
+    )
 
 
 @app.command()
