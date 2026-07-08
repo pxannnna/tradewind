@@ -51,7 +51,7 @@ def test_replay_tampered_fails(sample_trace: Path, tmp_path: Path) -> None:
 
 
 def test_future_phase_commands_exit_2() -> None:
-    for command in ("report", "diff", "bench"):
+    for command in ("report", "diff"):
         result = runner.invoke(app, [command])
         assert result.exit_code == 2, command
         assert "not implemented yet" in result.output

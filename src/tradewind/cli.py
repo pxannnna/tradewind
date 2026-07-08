@@ -157,9 +157,39 @@ def diff() -> None:
 
 
 @app.command()
-def bench() -> None:
-    """Run the seeded-fault benchmark (Phase 4)."""
-    _not_yet("Phase 4")
+def bench(
+    out: Annotated[
+        Path | None,
+        typer.Option(help="Directory to write results.md + results.json (default: print only)"),
+    ] = None,
+) -> None:
+    """Run the seeded-fault benchmark and report catch rates.
+
+    Exits 1 if any critical fault (F1/F2/F3/F5) went undetected — an honest
+    failure rather than a green light.
+    """
+    from tradewind.bench import run_benchmark
+
+    report = run_benchmark()
+    caught, total = report.catch_rate()
+    for fid in report.families():
+        f_caught, f_total = report.catch_rate(fid)
+        typer.echo(f"{fid}: {f_caught}/{f_total} caught")
+    typer.echo(f"ALL: {caught}/{total} caught")
+
+    if out is not None:
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "results.md").write_text(report.to_markdown(), encoding="utf-8")
+        import json
+
+        (out / "results.json").write_text(
+            json.dumps(report.to_json(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        typer.echo(f"results written to {out}/results.md and {out}/results.json")
+
+    if not report.critical_all_caught:
+        typer.echo("FAIL: a critical fault (F1/F2/F3/F5) went undetected", err=True)
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

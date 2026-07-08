@@ -139,6 +139,38 @@ the simpler, more testable option and record it here. Newest at the bottom.
   `datetime.combine(day, OPEN_TIME|CLOSE_TIME)` at fixed UTC times; no wall
   clock is read (still enforced by `test_no_wallclock.py`).
 
+## Phase 4 — Seeded-fault benchmark
+
+- **Scenarios observe, they don't assert.** Every one of the 17 scenarios runs
+  its fault against the *real* engine/portfolio/trace code and measures whether
+  it was caught (and by which mechanism / event seq). Nothing is hard-coded to
+  "detected", so a regression that breaks a guard turns that row red. 17
+  scenarios span F1(3)/F2(3)/F3(4)/F4(3)/F5(4) — ≥3 per family, ≥15 total.
+- **F4 uses a counter stand-in in `src`, real nondeterminism in `tests`.** The
+  no-wallclock lint forbids `time`/`random` anywhere in `src/tradewind`, so the
+  benchmark models a drifting value with a process-lifetime counter that is not
+  reset between the record and replay runs — faithfully reproducing how an
+  unseeded RNG or wall-clock read makes a reissued request hash differ and trip
+  `ReplayDivergence`. `tests/test_bench.py` additionally proves the identical
+  catch against genuine `random.Random()` and `time.perf_counter_ns`. This
+  keeps the benchmark deterministic and CI-safe while still demonstrating the
+  real mechanism.
+- **F4's honest limit, stated in the report and README.** The determinism check
+  can only catch nondeterminism that influences a recorded boundary request or
+  the event stream; nondeterminism that never changes a recorded byte is
+  invisible by construction. The three F4 scenarios (drift in an LLM request,
+  drift in a data request, an extra unrecorded call) all manifest that way, so
+  all three are caught — but the caveat is documented, not hidden.
+- **Committed, reproducible results.** `tradewind bench --out benchmarks/results`
+  writes `results.md` + `results.json`, byte-identical across runs (volatile
+  temp-dir paths are stripped from evidence strings). `bench` exits 1 if any
+  critical family (F1/F2/F3/F5) is not fully caught — an honest failure, not a
+  green light. Current result: **17/17 caught**.
+- **Slow-bleed fixture.** `benchmarks/data/bench/DECLINE.csv` is a hand-authored
+  steady decline (symbol `DECLINE`, 100 → 25) so a buy-and-bleed agent trips the
+  drawdown circuit breaker at a known bar; the scenario cites the first
+  `drawdown_breaker` violation's event seq from the recorded trace.
+
 - **Tooling scope.** ruff excludes `third_party/` (`extend-exclude`) and mypy's
   `files` targets only `src/tradewind`, so neither ever touches the read-only
   submodule. CI checks out without submodules, so lint/type/test/benchmark all

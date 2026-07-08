@@ -21,4 +21,6 @@ evaluation reports.
 - **Phase 3 — market replay simulator & paper fills:** implemented (bar-replay
   over bundled synthetic OHLCV, next-open fills with slippage/fees vetted by
   the invariant engine, golden-file test, `tradewind run`).
-- Phases 4–6: not started.
+- **Phase 4 — seeded-fault benchmark:** implemented — 17 scenarios across F1–F5,
+  **17/17 caught**; results in [`benchmarks/results/`](benchmarks/results/).
+- Phases 5–6: not started.
