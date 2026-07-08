@@ -28,3 +28,15 @@ class ReplayDivergence(TradewindError):
     whose ``request_hash`` is absent from (or exhausted in) the recording.
     Replay must never fall back to a live call.
     """
+
+
+class InvariantViolation(TradewindError):
+    """A hard risk invariant was breached where the code cannot safely continue.
+
+    The pipeline (Phase 2) normally reports breaches as ``VETO`` *verdicts*
+    that block an action without raising. This exception is reserved for the
+    non-negotiable cases: a fill whose own economics are internally
+    inconsistent (would create or destroy cash if applied), or a ``VETO``
+    under a ``HALT`` veto-policy. It always carries the offending evidence in
+    its message.
+    """

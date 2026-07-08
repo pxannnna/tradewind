@@ -65,6 +65,43 @@ the simpler, more testable option and record it here. Newest at the bottom.
   anchor). `parent_seq` must reference a strictly earlier event.
 - **Virtual time is timezone-aware UTC** and monotonic (no backwards jumps);
   the default epoch is 2000-01-01T00:00:00Z.
+
+## Phase 2 — Invariant engine
+
+- **One check signature, exactly as specified.** Every invariant is a frozen,
+  configured object with `check(state, action, ctx) -> Verdict`. Risk
+  thresholds live in the invariant instances (`RiskConfig` builds the
+  pipeline), market *facts* in `MarketContext`, microstructure (fees,
+  slippage) in `MarketModel`, and the portfolio in `PortfolioState`. This
+  keeps each argument a single clear concern.
+- **Projection is total, not raising.** `MarketContext.project_fill` returns
+  `Fill | None`; an unprojectable action (unknown symbol, no quote, qty ≤ 0 or
+  non-finite) yields `None`. Economic invariants return `PASS` on `None` and
+  let `OrderValidity` own that veto, so a single bad action produces one clear
+  violation rather than a pile-up of redundant ones.
+- **Money never rounds in the accounting path.** All amounts are exact
+  `Decimal`; `to_decimal` rejects `float` and `bool`. The conservation identity
+  `cash_delta + price·position_delta == -fees` therefore holds with a zero
+  residual, proven by a Hypothesis property over random fills. The one place
+  rounding is *defined* is `tradewind.money` (`quantize_cents`/`quantize_qty`),
+  used only at I/O boundaries.
+- **Two conservation surfaces, one law.** Cash conservation appears in the
+  pipeline (`CashConservation`, always `PASS` for an honest projection) *and*
+  is hard-enforced at fill application: `PortfolioState.apply_fill` calls
+  `verify_fill_consistency`, which raises `InvariantViolation` on a tampered
+  fill. The Verdict form (`check_fill_conservation`) gives the F2 benchmark a
+  reachable veto without applying the fill.
+- **Drawdown is a circuit breaker.** Once equity ≤ `high_water_mark ×
+  (1 − max_drawdown)`, `DrawdownBreaker` vetoes *every* action regardless of
+  its content — a halt, not a per-order check. The high-water mark is raised
+  only by `PortfolioState.mark`, called per bar in Phase 3.
+- **Idempotent replay = a pure fold.** `replay_fills` is referentially
+  transparent (invariant 7); re-applying a fill sequence yields the identical
+  final state, checked in `test_portfolio.py`.
+- **Removed a dead `isinstance(side, Side)` guard.** `ProposedAction.side` is a
+  `Side` enum by construction (`from_payload` raises on an unknown side before
+  an action can exist), so re-validating it is unreachable under the type
+  system; `OrderValidity` covers the real malformed-order classes instead.
 - **Tooling scope.** ruff excludes `third_party/` (`extend-exclude`) and mypy's
   `files` targets only `src/tradewind`, so neither ever touches the read-only
   submodule. CI checks out without submodules, so lint/type/test/benchmark all

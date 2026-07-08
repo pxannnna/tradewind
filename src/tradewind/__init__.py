@@ -9,8 +9,18 @@ framework-agnostic and must never import any agent framework or LLM SDK.
 Only ``tradewind.adapters.*`` may do that.
 """
 
-from tradewind.errors import ReplayDivergence, TraceIntegrityError, TradewindError
+from tradewind.errors import (
+    InvariantViolation,
+    ReplayDivergence,
+    TraceIntegrityError,
+    TradewindError,
+)
 
-__all__ = ["ReplayDivergence", "TraceIntegrityError", "TradewindError"]
+__all__ = [
+    "InvariantViolation",
+    "ReplayDivergence",
+    "TraceIntegrityError",
+    "TradewindError",
+]
 
 __version__ = "0.1.0"

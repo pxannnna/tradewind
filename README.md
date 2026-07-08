@@ -16,4 +16,6 @@ evaluation reports.
 ## Status
 
 - **Phase 1 — trace capture & deterministic replay:** implemented.
-- Phases 2–6: not started.
+- **Phase 2 — invariant engine:** implemented (six pure risk invariants +
+  conservation-enforcing portfolio, rogue-agent containment proven).
+- Phases 3–6: not started.
