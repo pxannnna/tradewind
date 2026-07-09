@@ -19,6 +19,10 @@ uv.lock
 # Secrets
 .env
 
+# Example outputs (the committed .jsonl traces are fixtures; reports are not)
+examples/traces/*.html
+examples/traces/*.tmp.jsonl
+
 # Editors
 .idea/
 .vscode/

@@ -26,4 +26,9 @@ evaluation reports.
 - **Phase 5 — evaluation reports:** implemented — `tradewind report` (self-contained
   HTML + JSON with equity curve, per-decision audit, violations, cost-by-role,
   determinism attestation) and `tradewind diff`.
-- Phase 6: not started.
+- **Phase 6 — TradingAgents adapter + MCP server:** implemented — documented
+  `create_llm_client` injection seam, pure mapping layer, boundary-backed
+  LangChain model, MCP tools, and a committed example trace
+  ([`examples/traces/`](examples/traces/)) that replays byte-identically with
+  no API key.
+- Remaining: the final README/writeup pass.

@@ -12,9 +12,19 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Installed only when driving the vendored TradingAgents framework (Phase 6).
+# Installed only when driving the vendored TradingAgents framework (Phase 6):
+# the adapter needs langchain-core/langgraph, plus an editable install of the
+# pinned submodule (pip install -e third_party/TradingAgents), plus a provider
+# API key — for RECORDING only. Replay never needs any of this.
 # The core harness must never import from this extra.
-tradingagents = []
+tradingagents = [
+    "langchain-core>=0.3",
+    "langgraph>=0.4",
+]
+# The MCP server (tradewind.mcp) — optional; handlers work without it.
+mcp = [
+    "mcp>=1.2",
+]
 
 [project.scripts]
 tradewind = "tradewind.cli:app"
@@ -27,6 +37,8 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "pre-commit>=3.7",
+    # So CI exercises the MCP server wiring without secrets.
+    "mcp>=1.2",
 ]
 
 [build-system]
@@ -78,6 +90,18 @@ python_version = "3.11"
 strict = true
 files = ["src/tradewind"]
 warn_unreachable = true
+
+[[tool.mypy.overrides]]
+# Optional heavy dependencies, imported lazily behind the extras; not installed
+# in the default dev environment or CI.
+module = ["langchain_core.*", "langgraph.*", "tradingagents.*", "mcp.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# This module subclasses LangChain's BaseChatModel, which is Any when the
+# extra is absent; allow that one pattern without weakening anything else.
+module = ["tradewind.adapters.tradingagents.boundary_model"]
+disable_error_code = ["misc"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

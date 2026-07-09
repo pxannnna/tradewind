@@ -201,6 +201,49 @@ the simpler, more testable option and record it here. Newest at the bottom.
   that cannot be line-wrapped without corrupting output; ruff's line-length rule
   is disabled for that one file only.
 
+## Phase 6 — TradingAgents adapter + MCP server
+
+- **The injection seam, precisely.** Read from the pinned v0.3.1 source:
+  `TradingAgentsGraph.__init__` builds its deep- and quick-thinking LLMs via
+  `create_llm_client(provider, model, ...)`, defined in
+  `tradingagents/llm_clients/factory.py` and imported by name into
+  `tradingagents/graph/trading_graph.py`. `patched_llm_clients` replaces
+  **both** bindings for the duration of a context manager with a factory
+  returning `BoundaryLLMClient`, whose `get_llm()` yields a LangChain
+  `BaseChatModel` routed through Tradewind's `LLMBoundary`. The submodule is
+  never edited; both bindings are restored on exit.
+- **Layered so the core never gets heavy.** `mapping.py` is pure (message ↔
+  request conversion, final-state → deliberation extraction keyed on the real
+  v0.3.1 state keys, 5-tier signal → `ProposedAction`) and fully tested with
+  no extras. `boundary_model.py` imports `langchain_core` lazily;
+  `adapter.py` imports `tradingagents` lazily; both raise
+  `AdapterDependencyMissing` with install instructions when absent, and CI
+  tests exactly those error paths.
+- **Signal mapping.** TradingAgents v0.3.1 emits a 5-tier rating
+  (`Buy/Overweight/Hold/Underweight/Sell`). Buy/Sell trade the configured full
+  quantity; Overweight/Underweight trade exactly half (exact Decimal); Hold
+  proposes nothing; anything else raises — a malformed decision must never
+  silently become an order.
+- **The committed example trace is scripted, and says so.** This build
+  environment has no provider API key and cannot install TradingAgents' full
+  dependency stack (langchain-\*, backtrader, redis, yfinance …), so a live
+  paid-model run could not be recorded here. `examples/tradingagents_e2e.py`
+  therefore records `examples/traces/tradingagents_demo.jsonl` through the
+  adapter's own pipeline — role-tagged boundary LLM calls, deliberation as
+  `agent_message` events, signal → action, invariant check, fill — with a
+  deterministic scripted LLM. The trace format and replay guarantees are
+  identical to a live recording; what differs is only who authored the words.
+  This is stated here and in the README rather than implied away. Recording a
+  live run is a documented three-step (editable-install the submodule, install
+  the extra, set a key) using `run_tradingagents`.
+- **MCP server is a thin shim, optional, and tested.** Handlers are plain
+  functions over JSON-native values calling the same library API as the CLI;
+  `create_server()` lazily imports the optional `mcp` package (extra
+  `tradewind[mcp]`) and registers the five spec'd tools. `mcp` sits in the dev
+  group so CI exercises the registration without secrets.
+- **CI now also runs the benchmark and replays the committed trace** on every
+  push — the spec's "no secrets required" end-to-end proof.
+
 - **Tooling scope.** ruff excludes `third_party/` (`extend-exclude`) and mypy's
   `files` targets only `src/tradewind`, so neither ever touches the read-only
   submodule. CI checks out without submodules, so lint/type/test/benchmark all
