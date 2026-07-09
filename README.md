@@ -23,4 +23,7 @@ evaluation reports.
   the invariant engine, golden-file test, `tradewind run`).
 - **Phase 4 — seeded-fault benchmark:** implemented — 17 scenarios across F1–F5,
   **17/17 caught**; results in [`benchmarks/results/`](benchmarks/results/).
-- Phases 5–6: not started.
+- **Phase 5 — evaluation reports:** implemented — `tradewind report` (self-contained
+  HTML + JSON with equity curve, per-decision audit, violations, cost-by-role,
+  determinism attestation) and `tradewind diff`.
+- Phase 6: not started.

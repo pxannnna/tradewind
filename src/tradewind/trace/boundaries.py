@@ -200,28 +200,36 @@ class LLMBoundary:
         self._wall = wall_timer if wall_timer is not None else WallTimer()
 
     def complete(
-        self, request: LLMRequest, parent_seq: int | None = None
+        self, request: LLMRequest, parent_seq: int | None = None, role: str | None = None
     ) -> tuple[LLMResponse, TraceEvent]:
-        """Run (or replay) one LLM call; append its ``llm_call`` event."""
+        """Run (or replay) one LLM call; append its ``llm_call`` event.
+
+        ``role`` optionally tags the call with the agent role that made it
+        (e.g. ``"analyst"``, ``"trader"``), so reports can total token/cost per
+        role. When ``None`` no role key is written, so existing traces and their
+        hashes are unaffected. The role is not part of the request hash — it is
+        provenance, not a request parameter.
+        """
         rhash = request.hash()
         if self._mode is Mode.RECORD:
             assert self._provider is not None
             marker = self._wall.start()
             live = self._provider.complete(request)
             latency_ms = self._wall.elapsed_ms(marker)
-            payload: dict[str, Any] = _as_stored(
-                {
-                    "request_hash": rhash,
-                    "request": request.model_dump(mode="json"),
-                    "response": live.model_dump(mode="json"),
-                    "latency_ms": latency_ms,
-                    "token_counts": {
-                        "prompt": live.prompt_tokens,
-                        "completion": live.completion_tokens,
-                    },
-                    "cost_estimate": live.cost_estimate,
-                }
-            )
+            body: dict[str, Any] = {
+                "request_hash": rhash,
+                "request": request.model_dump(mode="json"),
+                "response": live.model_dump(mode="json"),
+                "latency_ms": latency_ms,
+                "token_counts": {
+                    "prompt": live.prompt_tokens,
+                    "completion": live.completion_tokens,
+                },
+                "cost_estimate": live.cost_estimate,
+            }
+            if role is not None:
+                body["role"] = role
+            payload: dict[str, Any] = _as_stored(body)
         else:
             assert self._index is not None
             payload = self._index.lookup("llm_call", rhash)

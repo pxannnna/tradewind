@@ -60,11 +60,6 @@ def replay(
         typer.echo(f"replayed trace written to {report.replayed_path}")
 
 
-def _not_yet(phase: str) -> None:
-    typer.echo(f"not implemented yet (arrives in {phase})", err=True)
-    raise typer.Exit(code=2)
-
-
 class AgentChoice(StrEnum):
     """Built-in scripted agents selectable from the CLI."""
 
@@ -145,15 +140,72 @@ def run(
 
 
 @app.command()
-def report() -> None:
-    """Render an evaluation report from a trace (Phase 5)."""
-    _not_yet("Phase 5")
+def report(
+    trace: _TracePath,
+    out_html: Annotated[Path | None, typer.Option(help="Write the HTML report here")] = None,
+    out_json: Annotated[Path | None, typer.Option(help="Write the JSON report here")] = None,
+    initial_cash: Annotated[
+        str | None, typer.Option(help="Baseline for the equity curve (default: P&L from 0)")
+    ] = None,
+) -> None:
+    """Render an evaluation report (HTML + JSON) from a verified trace."""
+    import json
+
+    from tradewind.report import build_report_model, render_report_html
+
+    try:
+        model = build_report_model(
+            trace, Decimal(initial_cash) if initial_cash is not None else Decimal(0)
+        )
+    except (TraceIntegrityError, ReplayDivergence) as exc:
+        typer.echo(f"FAIL: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if out_html is not None:
+        out_html.write_text(render_report_html(model), encoding="utf-8")
+        typer.echo(f"HTML report written to {out_html}")
+    if out_json is not None:
+        out_json.write_text(
+            json.dumps(model.to_json(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        typer.echo(f"JSON report written to {out_json}")
+    verified = "verified" if model.replay_verified else "NOT verified"
+    typer.echo(
+        f"REPORT OK: {model.event_count} events, {model.proposed} proposed, "
+        f"{model.admitted} admitted, {model.violation_count} violations, replay {verified}"
+    )
 
 
 @app.command()
-def diff() -> None:
-    """Diff two traces to find the first decision divergence (Phase 5)."""
-    _not_yet("Phase 5")
+def diff(
+    left: _TracePath,
+    right: _TracePath,
+    out_html: Annotated[Path | None, typer.Option(help="Write the HTML diff here")] = None,
+    out_json: Annotated[Path | None, typer.Option(help="Write the JSON diff here")] = None,
+) -> None:
+    """Diff two traces to find where their decisions first diverged."""
+    import json
+
+    from tradewind.report import diff_traces, render_diff_html
+
+    try:
+        result = diff_traces(left, right)
+    except (TraceIntegrityError, ReplayDivergence) as exc:
+        typer.echo(f"FAIL: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if out_html is not None:
+        out_html.write_text(render_diff_html(result), encoding="utf-8")
+        typer.echo(f"HTML diff written to {out_html}")
+    if out_json is not None:
+        out_json.write_text(
+            json.dumps(result.to_json(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        typer.echo(f"JSON diff written to {out_json}")
+    if result.diverged:
+        typer.echo(f"DIVERGED: first at seq {result.first_divergence_seq}")
+    else:
+        typer.echo("IDENTICAL: traces align on every event")
 
 
 @app.command()

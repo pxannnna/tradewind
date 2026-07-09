@@ -171,6 +171,36 @@ the simpler, more testable option and record it here. Newest at the bottom.
   drawdown circuit breaker at a known bar; the scenario cites the first
   `drawdown_breaker` violation's event seq from the recorded trace.
 
+## Phase 5 — Evaluation reports
+
+- **Reports are reconstructed from the trace, not from run state.**
+  `build_report_model` verifies the trace, then rebuilds the decision chain
+  purely from events and their `parent_seq` links, and attempts a byte-identical
+  replay to set the determinism-attestation flag. It invents nothing the trace
+  does not contain — so the report is an audit, not a re-narration.
+- **Equity curve is honest about being marks-only.** The trace records fills,
+  not per-bar marks, so the curve is cumulative portfolio value *at fill
+  prices* (each position marked at its most recent trade). With `--initial-cash`
+  it is absolute equity; without, it is P&L from zero. The report labels it
+  "marks at fill prices" so the gaps between trades are never oversold, and no
+  initial-capital figure has to be smuggled into the trace.
+- **Self-contained HTML via autoescaping Jinja2.** Output is one file: inline
+  CSS, an inline dependency-free SVG chart, no `<script>`, no external URLs — it
+  opens offline anywhere. Autoescaping is on, and a test feeds a
+  `<img onerror=…>` symbol through to prove hostile trace text renders as inert
+  text, not markup (LLM output is untrusted).
+- **Optional `role` tag on LLM calls.** `LLMBoundary.complete(..., role=...)`
+  writes a `role` key into the `llm_call` payload when given (default `None`
+  writes nothing, so existing traces and their hashes are unchanged). The report
+  totals token/cost by that role, falling back to the model id, then
+  "unattributed". The Phase 6 adapter will tag each call with its agent role.
+- **`diff` aligns by seq on `(event_type, canonical payload)`** and reports the
+  first divergent seq — enough to show where two runs (e.g. same config, two
+  models) first parted ways. Both `report` and `diff` emit HTML + JSON.
+- **render.py is E501-exempt.** The HTML/CSS templates are long inline strings
+  that cannot be line-wrapped without corrupting output; ruff's line-length rule
+  is disabled for that one file only.
+
 - **Tooling scope.** ruff excludes `third_party/` (`extend-exclude`) and mypy's
   `files` targets only `src/tradewind`, so neither ever touches the read-only
   submodule. CI checks out without submodules, so lint/type/test/benchmark all

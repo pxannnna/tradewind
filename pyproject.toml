@@ -8,6 +8,7 @@ license = { text = "MIT" }
 dependencies = [
     "pydantic>=2.7",
     "typer>=0.12",
+    "jinja2>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -69,6 +70,8 @@ ignore = [
 "tests/**" = ["D"]
 "examples/**" = ["D"]
 "benchmarks/**" = ["D"]
+# The HTML/CSS templates are long inline strings that cannot be wrapped.
+"src/tradewind/report/render.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"
